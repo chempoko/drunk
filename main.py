@@ -49,6 +49,15 @@ def get_main_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
+def get_group_reply_keyboard():
+    """Reply-клавиатура для панели ввода в групповых чатах"""
+    keyboard = [
+        ["🛡️ Взять аскезу", "🍺 Выпить"],
+        ["📊 Мой прогресс", "📈 Статистика"],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
 def get_inline_keyboard():
     """Inline-клавиатура для групповых чатов"""
     keyboard = [
@@ -94,6 +103,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode="HTML",
             reply_markup=get_inline_keyboard(),
         )
+        # Также отправляем reply-клавиатуру на панель ввода
+        await update.message.reply_text(
+            "👇 Кнопки на панели ввода:",
+            reply_markup=get_group_reply_keyboard(),
+        )
     else:
         await update.message.reply_text(
             welcome_text,
@@ -118,11 +132,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if is_group_chat(update):
         await update.message.reply_text(help_text, parse_mode="HTML", reply_markup=get_inline_keyboard())
+        await update.message.reply_text(
+            "👇 Кнопки на панели ввода:",
+            reply_markup=get_group_reply_keyboard(),
+        )
     else:
         await update.message.reply_text(help_text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
 
 # ─── Обработчики действий ──────────────────────────────────────
+
+def _get_reply_markup(update: Update):
+    """Выбрать reply-клавиатуру в зависимости от типа чата"""
+    if is_group_chat(update):
+        return get_group_reply_keyboard()
+    return get_main_keyboard()
+
 
 async def handle_abstinence(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
     """Обработка 'Взять аскезу'"""
@@ -144,10 +169,9 @@ async def handle_abstinence(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     if is_callback:
         query = update.callback_query
-        # Отправляем новое сообщение с inline-кнопками, не трогая исходное
         await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=get_main_keyboard())
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_drinking(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -169,7 +193,7 @@ async def handle_drinking(update: Update, context: ContextTypes.DEFAULT_TYPE, is
         query = update.callback_query
         await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=get_main_keyboard())
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -201,7 +225,7 @@ async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, is
         query = update.callback_query
         await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=get_main_keyboard())
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -234,7 +258,7 @@ async def handle_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         query = update.callback_query
         await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=get_main_keyboard())
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 # ─── CallbackQueryHandler (inline-кнопки) ──────────────────────
@@ -266,12 +290,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ─── MessageHandler (текстовые сообщения) ──────────────────────
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработка текстовых сообщений (только в личных чатах)"""
-    # В групповых чатах текстовые сообщения игнорируем —
-    # взаимодействие только через inline-кнопки
-    if is_group_chat(update):
-        return
-
+    """Обработка текстовых сообщений (личные чаты и reply-кнопки в группах)"""
     text = update.message.text
 
     if text == "🛡️ Взять аскезу":
@@ -282,10 +301,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await handle_progress(update, context)
     elif text == "📈 Статистика":
         await handle_statistics(update, context)
+    elif is_group_chat(update):
+        # В групповых чатах игнорируем произвольный текст, но не кнопки
+        return
     else:
         await update.message.reply_text(
             "Я тебя не понимаю 🤔\n\nИспользуй кнопки меню ниже.",
-            reply_markup=get_main_keyboard(),
+            reply_markup=_get_reply_markup(update),
         )
 
 
