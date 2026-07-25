@@ -244,10 +244,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     data = query.data
 
-    logger.info(f"Получен callback: data={data}, user={query.from_user.id}, chat={query.message.chat.id if query.message else 'N/A'}")
+    logger.info(f"📩 Получен callback: data={data}, user={query.from_user.id}, chat={query.message.chat.id if query.message else 'N/A'}")
 
     # Обязательно отвечаем на callback, чтобы Telegram знал, что мы обработали нажатие
-    await query.answer()
+    # Показываем всплывающее уведомление пользователю
+    await query.answer(text=f"Обрабатываю: {data}...", show_alert=False)
 
     if data == "abstinence":
         await handle_abstinence(update, context, is_callback=True)
@@ -257,6 +258,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await handle_progress(update, context, is_callback=True)
     elif data == "stats":
         await handle_statistics(update, context, is_callback=True)
+    else:
+        logger.warning(f"⚠️ Неизвестный callback data: {data}")
+        await query.answer(text="Неизвестная команда", show_alert=True)
 
 
 # ─── MessageHandler (текстовые сообщения) ──────────────────────
@@ -291,14 +295,19 @@ def main():
     """Главная функция"""
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # CommandHandler имеет приоритет по умолчанию (group=0)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", handle_statistics))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    
+    # CallbackQueryHandler должен быть выше MessageHandler в порядке обработки
+    # group=1 означает более высокий приоритет, чем у MessageHandler (group=2)
+    application.add_handler(CallbackQueryHandler(button_callback), group=1)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
 
     logger.info("Бот запущен...")
-    application.run_polling()
+    # Явно указываем allowed_updates, чтобы получать callback_query
+    application.run_polling(allowed_updates=["message", "callback_query", "chat_member"])
 
 
 if __name__ == "__main__":
