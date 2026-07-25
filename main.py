@@ -194,7 +194,35 @@ async def handle_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработка текстовых сообщений"""
+    # В групповых чатах реагируем только если:
+    # 1. Сообщение является ответом на сообщение бота
+    # 2. Бот упомянут через @username
+    chat_type = update.effective_chat.type if update.effective_chat else None
+    
+    if chat_type in ("group", "supergroup"):
+        bot_username = context.bot.username if context.bot else None
+        is_reply_to_bot = (
+            update.message.reply_to_message
+            and update.message.reply_to_message.from_user
+            and update.message.reply_to_message.from_user.is_bot
+        )
+        is_mention = (
+            bot_username
+            and update.message.text
+            and f"@{bot_username}" in update.message.text
+        )
+        
+        if not is_reply_to_bot and not is_mention:
+            # Игнорируем сообщение в группе — не наша цель
+            return
+    
     text = update.message.text
+    
+    # Если бот упомянут через @ — убираем @username из текста для сравнения с кнопками
+    if chat_type in ("group", "supergroup") and context.bot and context.bot.username:
+        mention = f"@{context.bot.username}"
+        if mention in text:
+            text = text.replace(mention, "").strip()
     
     if text == "🛡️ Взять аскезу":
         await handle_abstinence(update, context)
