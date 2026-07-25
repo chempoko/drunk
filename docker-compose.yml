@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  drunk-bot:
+    build: .
+    container_name: drunk-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - ./sobriety.db:/app/sobriety.db
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
