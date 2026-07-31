@@ -169,9 +169,9 @@ def get_days_of_abstinence(user_id):
         except (ValueError, TypeError):
             pass
     
-    # Считаем полные дни (меньше 1 дня = 0 дней)
-    delta = datetime.now().date() - started.date()
-    days = max(0, delta.days)
+    # Считаем полные 24-часовые периоды (меньше 24 часов = 0 дней)
+    delta = datetime.now() - started
+    days = max(0, int(delta.total_seconds() // 86400))
     return days
 
 
