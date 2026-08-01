@@ -230,8 +230,9 @@ def get_group_stats():
             'started_at': user['started_at']
         })
     
-    # Сортируем по количеству дней (по убыванию)
-    stats_list.sort(key=lambda x: x['days'], reverse=True)
+    # Сортируем по количеству дней (по убыванию),
+    # при равном количестве дней — кто раньше начал (started_at ASC)
+    stats_list.sort(key=lambda x: (-x['days'], x['started_at'] or ''))
     
     return stats_list
 
