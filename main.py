@@ -2,21 +2,12 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ChatMemberHandler,
-    InlineQueryHandler,
     ContextTypes,
     filters,
 )
@@ -112,7 +103,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode="HTML",
             reply_markup=get_inline_keyboard(),
         )
-        # Также отправляем reply-клавиатуру на панель ввода (свернутую)
+        # Также отправляем reply-клавиатуру на панель ввода
         await update.message.reply_text(
             "👇 Кнопки на панели ввода:",
             reply_markup=get_group_reply_keyboard(),
@@ -158,23 +149,6 @@ def _get_reply_markup(update: Update):
     return get_main_keyboard()
 
 
-async def _send_with_keyboards(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, parse_mode: str = "HTML", is_callback: bool = False):
-    """Отправить сообщение с inline и reply клавиатурами (для групповых чатов)"""
-    if is_callback:
-        query = update.callback_query
-        # Отвечаем на callback сначала
-        # Затем отправляем новое сообщение с inline-клавиатурой
-        await query.message.reply_text(text, parse_mode=parse_mode, reply_markup=get_inline_keyboard())
-        # И обновляем reply-клавиатуру на панели ввода
-        if is_group_chat(update):
-            await query.message.reply_text(
-                "👇 Кнопки на панели ввода:",
-                reply_markup=get_group_reply_keyboard(),
-            )
-    else:
-        await update.message.reply_text(text, parse_mode=parse_mode, reply_markup=_get_reply_markup(update))
-
-
 async def handle_abstinence(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
     """Обработка 'Взять аскезу'"""
     user = update.effective_user
@@ -194,9 +168,10 @@ async def handle_abstinence(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         )
 
     if is_callback:
-        await _send_with_keyboards(update, context, text, is_callback=True)
+        query = update.callback_query
+        await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await _send_with_keyboards(update, context, text)
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_drinking(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -215,9 +190,10 @@ async def handle_drinking(update: Update, context: ContextTypes.DEFAULT_TYPE, is
         )
 
     if is_callback:
-        await _send_with_keyboards(update, context, text, is_callback=True)
+        query = update.callback_query
+        await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await _send_with_keyboards(update, context, text)
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -246,9 +222,10 @@ async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, is
             text += "🆕 Ты только что начал! Держи курс!\n"
 
     if is_callback:
-        await _send_with_keyboards(update, context, text, is_callback=True)
+        query = update.callback_query
+        await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await _send_with_keyboards(update, context, text)
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 async def handle_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback: bool = False) -> None:
@@ -278,9 +255,10 @@ async def handle_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             text += f"\n\n👤 <b>Твоя позиция:</b> #{user_position}"
 
     if is_callback:
-        await _send_with_keyboards(update, context, text, is_callback=True)
+        query = update.callback_query
+        await query.message.reply_text(text, parse_mode="HTML", reply_markup=get_inline_keyboard())
     else:
-        await _send_with_keyboards(update, context, text)
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=_get_reply_markup(update))
 
 
 # ─── CallbackQueryHandler (inline-кнопки) ──────────────────────
@@ -324,105 +302,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif text == "📈 Статистика":
         await handle_statistics(update, context)
     elif is_group_chat(update):
-        # В групповых чатах игнорируем произвольный текст
-        # Но отправляем reply-клавиатуру, чтобы она оставалась видимой
-        await update.message.reply_text(
-            "👇 Кнопки на панели ввода:",
-            reply_markup=get_group_reply_keyboard(),
-        )
+        # В групповых чатах игнорируем произвольный текст, но не кнопки
+        return
     else:
         await update.message.reply_text(
             "Я тебя не понимаю 🤔\n\nИспользуй кнопки меню ниже.",
             reply_markup=_get_reply_markup(update),
         )
-
-
-# ─── ChatMemberHandler (добавление бота в группу) ──────────────
-
-async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработка изменения статуса бота в чате (добавление в группу)"""
-    if not update.my_chat_member:
-        return
-
-    chat = update.effective_chat
-    new_status = update.my_chat_member.new_chat_member.status
-
-    logger.info(f"🤖 Статус бота в чате {chat.id} ({chat.type}): {new_status}")
-
-    # Когда бота добавляют в группу
-    if new_status in ("member", "administrator") and chat.type in ("group", "supergroup"):
-        welcome_text = (
-            "🌟 <b>Всем привет!</b>\n\n"
-            "Я бот для отслеживания дней без алкоголя.\n\n"
-            "Мои функции:\n"
-            "🛡️ <b>Взять аскезу</b> - начать отсчет дней\n"
-            "🍺 <b>Выпить</b> - обнулить счетчик\n"
-            "📊 <b>Мой прогресс</b> - посмотреть текущий счетчик\n"
-            "📈 <b>Статистика</b> - подробная информация\n\n"
-            "Используйте кнопки ниже 👇"
-        )
-        await chat.send_message(
-            welcome_text,
-            parse_mode="HTML",
-            reply_markup=get_inline_keyboard(),
-        )
-        # Отправляем reply-клавиатуру на панель ввода (свернутую)
-        await chat.send_message(
-            "👇 Кнопки на панели ввода:",
-            reply_markup=get_group_reply_keyboard(),
-        )
-
-
-# ─── InlineQueryHandler (обработка @упоминаний в группах) ──────
-
-async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработка inline-запросов (@bot_username в поле ввода)"""
-    query = update.inline_query.query
-
-    logger.info(f"🔍 Inline query: '{query}' from user {update.effective_user.id}")
-
-    # Если пользователь просто упомянул бота (пустой запрос или "Search...")
-    # Показываем подсказку как пользоваться ботом
-    results = [
-        InlineQueryResultArticle(
-            id="1",
-            title="🛡️ Взять аскезу",
-            description="Начать отсчет дней без алкоголя",
-            input_message_content=InputTextMessageContent(
-                "🛡️ Взять аскезу",
-                parse_mode="HTML",
-            ),
-        ),
-        InlineQueryResultArticle(
-            id="2",
-            title="🍺 Выпить",
-            description="Обнулить счетчик",
-            input_message_content=InputTextMessageContent(
-                "🍺 Выпить",
-                parse_mode="HTML",
-            ),
-        ),
-        InlineQueryResultArticle(
-            id="3",
-            title="📊 Мой прогресс",
-            description="Посмотреть текущий счетчик",
-            input_message_content=InputTextMessageContent(
-                "📊 Мой прогресс",
-                parse_mode="HTML",
-            ),
-        ),
-        InlineQueryResultArticle(
-            id="4",
-            title="📈 Статистика",
-            description="Подробная информация",
-            input_message_content=InputTextMessageContent(
-                "📈 Статистика",
-                parse_mode="HTML",
-            ),
-        ),
-    ]
-
-    await update.inline_query.answer(results, cache_time=0, is_personal=True)
 
 
 # ─── Главная функция ────────────────────────────────────────────
@@ -441,15 +327,9 @@ def main():
     application.add_handler(CallbackQueryHandler(button_callback), group=1)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
 
-    # ChatMemberHandler для отслеживания добавления бота в группу
-    application.add_handler(ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
-
-    # InlineQueryHandler для обработки @упоминаний бота в группах
-    application.add_handler(InlineQueryHandler(inline_query))
-
     logger.info("Бот запущен...")
-    # Явно указываем allowed_updates, чтобы получать callback_query и chat_member
-    application.run_polling(allowed_updates=["message", "callback_query", "chat_member", "inline_query"])
+    # Явно указываем allowed_updates, чтобы получать callback_query
+    application.run_polling(allowed_updates=["message", "callback_query", "chat_member"])
 
 
 if __name__ == "__main__":
