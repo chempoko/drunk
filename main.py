@@ -214,8 +214,10 @@ async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, is
         )
         if days >= 30:
             text += "🎉 Отличный результат! Продолжай в том же духе!\n"
+        elif days >= 14:
+            text += "😮 Воу-воу! Кто ты воин!?\n"
         elif days >= 7:
-            text += "💪 Неплохо! Еще немного и неделя будет позади!\n"
+            text += "💪 Неплохо! Неделя позади!\n"
         elif days >= 1:
             text += "🌱 Хороший старт! Каждый день - это победа!\n"
         else:
