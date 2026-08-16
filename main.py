@@ -49,15 +49,6 @@ def get_main_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-def get_group_reply_keyboard():
-    """Reply-клавиатура для панели ввода в групповых чатах"""
-    keyboard = [
-        ["🛡️ Взять аскезу", "🍺 Выпить"],
-        ["📊 Мой прогресс", "📈 Статистика"],
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-
 def get_inline_keyboard():
     """Inline-клавиатура для групповых чатов"""
     keyboard = [
@@ -98,16 +89,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     if is_group_chat(update):
-        await update.message.reply_text(
+        welcome_message = await update.message.reply_text(
             welcome_text,
             parse_mode="HTML",
             reply_markup=get_inline_keyboard(),
         )
-        # Также отправляем reply-клавиатуру на панель ввода
-        await update.message.reply_text(
-            "👇 Кнопки на панели ввода:",
-            reply_markup=get_group_reply_keyboard(),
-        )
+        # Закрепляем сообщение с кнопками, чтобы оно всегда было вверху чата
+        try:
+            await context.bot.pin_chat_message(
+                chat_id=update.effective_chat.id,
+                message_id=welcome_message.message_id,
+                disable_notification=True,
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось закрепить сообщение с кнопками: {e}")
     else:
         await update.message.reply_text(
             welcome_text,
@@ -132,10 +127,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if is_group_chat(update):
         await update.message.reply_text(help_text, parse_mode="HTML", reply_markup=get_inline_keyboard())
-        await update.message.reply_text(
-            "👇 Кнопки на панели ввода:",
-            reply_markup=get_group_reply_keyboard(),
-        )
     else:
         await update.message.reply_text(help_text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
@@ -143,9 +134,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # ─── Обработчики действий ──────────────────────────────────────
 
 def _get_reply_markup(update: Update):
-    """Выбрать reply-клавиатуру в зависимости от типа чата"""
+    """Клавиатура в ответе: в группе — inline, в личке — главная"""
     if is_group_chat(update):
-        return get_group_reply_keyboard()
+        return get_inline_keyboard()
     return get_main_keyboard()
 
 
